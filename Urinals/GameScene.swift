@@ -1,20 +1,7 @@
 import SpriteKit
 
 class GameScene: SKScene {
-    
-    // Circle properties
-    enum CircleColor {
-        case red, yellow
-        
-        func toSKColor() -> SKColor {
-            switch self {
-                case .red: return .red
-                case .yellow: return .yellow
-            }
-        }
-    }
-    
-    enum CircleSize {
+    enum UrinalSize {
         case small, big
         
         func radius() -> CGFloat {
@@ -25,16 +12,16 @@ class GameScene: SKScene {
         }
     }
     
-    struct CircleProperties {
-        let color: CircleColor
-        let hasDot: Bool
-        let size: CircleSize
+    struct UrinalProperties {
+        var isTaken: Bool
+        var isDirty: Bool
+        var size: UrinalSize
     }
     
     // Game state
     private var gameObjects: [SKNode] = []
     private var dynamicSpacing: CGFloat = 100
-    private var dynamicRadiusMultiplier: CGFloat = 1.0
+    private var dynamicRadiusMultiplier: CGFloat = 2.0
     
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(white: 0.95, alpha: 1.0)
@@ -49,14 +36,14 @@ class GameScene: SKScene {
         gameObjects.forEach { $0.removeFromParent() }
         gameObjects.removeAll()
         
-        // Generate random number of circles (1-10)
-        let numberOfCircles = Int.random(in: 1...10)
-        print("Number of circles: \(numberOfCircles)")
+        // Generate random number of urinals (1-8)
+        let numberOfUrinals = Int.random(in: 1...8)
+        print("Number of circles: \(numberOfUrinals)")
         
-        // Determine if squares will be added
-        let hasStartSquare = Bool.random()
-        let hasEndSquare = Bool.random()
-        let totalObjects = numberOfCircles + (hasStartSquare ? 1 : 0) + (hasEndSquare ? 1 : 0)
+        // Determine if stalls will be added
+        let hasStartStall = Bool.random()
+        let hasEndStall = Bool.random()
+        let totalObjects = numberOfUrinals + (hasStartStall ? 1 : 0) + (hasEndStall ? 1 : 0)
         
         // Calculate dynamic sizing to fit everything on screen
         let edgePadding: CGFloat = 40 // Padding from screen edges
@@ -65,15 +52,15 @@ class GameScene: SKScene {
         // We need (totalObjects - 1) gaps between objects
         let numberOfGaps = totalObjects - 1
         
-        // Assume average circle radius is 32.5 (midpoint between small 25 and big 40)
+        // Assume average urinal radius is 32.5 (midpoint between small 25 and big 40)
         // Each object needs diameter space, plus spacing between
-        let baseCircleRadius: CGFloat = 32.5
-        let baseSquareSize: CGFloat = 50
+        let baseUrinalSize: CGFloat = 32.5
+        let baseStallSize: CGFloat = 100
         
         // Estimate total width needed with base sizes
-        let estimatedCircleSpace = CGFloat(numberOfCircles) * (baseCircleRadius * 2)
-        let estimatedSquareSpace = CGFloat((hasStartSquare ? 1 : 0) + (hasEndSquare ? 1 : 0)) * baseSquareSize
-        let baseSpacing: CGFloat = 100
+        let estimatedCircleSpace = CGFloat(numberOfUrinals) * (baseUrinalSize * 2)
+        let estimatedSquareSpace = CGFloat((hasStartStall ? 1 : 0) + (hasEndStall ? 1 : 0)) * baseStallSize
+        let baseSpacing: CGFloat = 40
         let estimatedSpacingNeeded = CGFloat(numberOfGaps) * baseSpacing
         let estimatedTotalWidth = estimatedCircleSpace + estimatedSquareSpace + estimatedSpacingNeeded
         
@@ -95,26 +82,44 @@ class GameScene: SKScene {
         print("Scene width: \(size.width), Total width needed: \(totalWidth), Start X: \(startX)")
         
         // Potentially add square at index 0 (before first circle)
-        if hasStartSquare {
-            let squareSize = 50 * scaleFactor
-            let square = createSquare(at: CGPoint(x: currentX + squareSize / 2, y: size.height / 2), size: squareSize)
-            addChild(square)
-            gameObjects.append(square)
-            print("Added square at beginning at x: \(currentX)")
-            currentX += squareSize + dynamicSpacing
+        if hasStartStall {
+            let stallSize = 100 * scaleFactor
+            let stall = createStallLeft(at: CGPoint(x: currentX + stallSize / 2, y: size.height / 2), size: stallSize)
+            addChild(stall)
+            gameObjects.append(stall)
+            print("Added stall at beginning at x: \(currentX)")
+            currentX += stallSize + dynamicSpacing
         }
         
         // Generate circles
-        for i in 0..<numberOfCircles {
-            let properties = CircleProperties(
-                color: Bool.random() ? .red : .yellow,
-                hasDot: Bool.random(),
+        var numTaken = 0
+        var numDirty = 0
+        
+        for i in 0..<numberOfUrinals {
+            var properties = UrinalProperties(
+                isTaken: false,
+                isDirty: false,
                 size: Bool.random() ? .small : .big
             )
             
+            if (numTaken < numberOfUrinals - 1) {
+                let taken = Bool.random()
+                properties.isTaken = taken
+                if taken {
+                    numTaken += 1
+                }
+            }
+            if (numDirty < numberOfUrinals - 1) {
+                let dirty = Bool.random()
+                properties.isDirty = dirty
+                if dirty {
+                    numDirty += 1
+                }
+            }
+            
             let radius = properties.size.radius() * dynamicRadiusMultiplier
             let position = CGPoint(x: currentX + radius, y: size.height / 2)
-            let circle = createCircle(with: properties, at: position, index: i)
+            let circle = createUrinal(with: properties, at: position, index: i)
             addChild(circle)
             gameObjects.append(circle)
             print("Added circle \(i) at position: \(position)")
@@ -122,51 +127,63 @@ class GameScene: SKScene {
         }
         
         // Potentially add square at index 11 (after last circle)
-        if hasEndSquare {
-            let squareSize = 50 * scaleFactor
-            let square = createSquare(at: CGPoint(x: currentX + squareSize / 2, y: size.height / 2), size: squareSize)
-            addChild(square)
-            gameObjects.append(square)
-            print("Added square at end at x: \(currentX)")
+        if hasEndStall {
+            let stallSize = 100 * scaleFactor
+            let stall = createStallRight(at: CGPoint(x: currentX + stallSize / 2, y: size.height / 2), size: stallSize)
+            addChild(stall)
+            gameObjects.append(stall)
+            print("Added stall at end at x: \(currentX)")
         }
         
         print("Level generation complete. Total objects: \(gameObjects.count)")
     }
     
-    func createCircle(with properties: CircleProperties, at position: CGPoint, index: Int) -> SKNode {
+    func createUrinal(with properties: UrinalProperties, at position: CGPoint, index: Int) -> SKNode {
         let container = SKNode()
         container.position = position
         container.name = "circle_\(index)"
         
-        // Create main circle with dynamic sizing
         let radius = properties.size.radius() * dynamicRadiusMultiplier
-        let circle = SKShapeNode(circleOfRadius: radius)
-        circle.fillColor = properties.color.toSKColor()
-        circle.strokeColor = .black
-        circle.lineWidth = 2 * dynamicRadiusMultiplier
         
-        container.addChild(circle)
+        // Use a single base circle image
+        let sprite = SKSpriteNode(imageNamed: "urinal")
+        sprite.size = CGSize(width: radius * 2, height: radius * 2)
+        sprite.zPosition = 0
+        container.addChild(sprite)
         
-        // Add dot if needed
-        if properties.hasDot {
-            let dot = SKShapeNode(circleOfRadius: radius * 0.2)
-            dot.fillColor = .black
-            dot.strokeColor = .black
-            container.addChild(dot)
+        if properties.isDirty && !properties.isTaken {
+            let dotSprite = SKSpriteNode(imageNamed: "piss")
+            dotSprite.size = CGSize(width: radius, height: radius)
+            dotSprite.zPosition = 1
+            container.addChild(dotSprite)
+        }
+        
+        if properties.isTaken {
+            let manSprite = SKSpriteNode(imageNamed: "man")
+            manSprite.size = CGSize(width: 40 * dynamicRadiusMultiplier, height: 40 * dynamicRadiusMultiplier * 2)
+            manSprite.zPosition = 2
+            container.addChild(manSprite)
         }
         
         return container
     }
     
-    func createSquare(at position: CGPoint, size: CGFloat) -> SKNode {
-        let square = SKShapeNode(rectOf: CGSize(width: size, height: size))
-        square.position = position
-        square.fillColor = .blue
-        square.strokeColor = .black
-        square.lineWidth = 2 * dynamicRadiusMultiplier
-        square.name = "square"
+    func createStallLeft(at position: CGPoint, size: CGFloat) -> SKNode {
+        let sprite = SKSpriteNode(imageNamed: "bathroom_stall_left")
+        sprite.position = position
+        sprite.size = CGSize(width: size, height: size)
+        sprite.name = "bathroom_stall_left"
         
-        return square
+        return sprite
+    }
+    
+    func createStallRight(at position: CGPoint, size: CGFloat) -> SKNode {
+        let sprite = SKSpriteNode(imageNamed: "bathroom_stall_right")
+        sprite.position = position
+        sprite.size = CGSize(width: size, height: size)
+        sprite.name = "bathroom_stall_right"
+        
+        return sprite
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
